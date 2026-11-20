@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vpp-play"
+version = "1.0.0"
+description = "VPP 拟物互动导演层：全模拟的 Agent 奖惩 MCP Server（不连接任何真实硬件）"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "mcp>=2.0",
+    "pydantic>=2.7",
+]
+
+[project.scripts]
+vpp-server = "vpp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vpp", "src/mock_downstream"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
