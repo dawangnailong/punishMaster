@@ -36,6 +36,12 @@ from .catalog import (
 from .clock import Clock
 from .config import HARD_LIMITS, SessionConfig
 from .crew import CrewPort, MockPropsCrew, RenderContext, SIM_NOTE
+from .link import (
+    CONNECT_NARRATION,
+    LINK_NOTE,
+    device_or_none,
+    scan_report,
+)
 from .protocol import (
     ActionEnvelope,
     ActionResult,
@@ -791,6 +797,105 @@ class Director:
                 "执行仍须通过用户边界：允许清单 + 行为开关 + 强度/时长上限（fail-closed）。"
                 "未注册/未授权的效果一律拒绝。"
             ),
+        }
+
+    # ================================================================ 虚拟链路
+
+    def link_scan(self) -> dict[str, Any]:
+        """扫描假想设备名册：函数形状保留，无任何真实扫描活动。"""
+        return scan_report()
+
+    def link_connect(self, session_id: str, device_id: str) -> dict[str, Any]:
+        """把一个假想注册的模拟设备绑定进会话（本地状态写入；连接 ≠ 授权）。"""
+        sess = self._get(session_id)
+        self._tick(sess)
+        if sess.state not in (
+            SessionState.DRAFT, SessionState.READY, SessionState.ACTIVE, SessionState.PAUSED,
+        ):
+            raise VPPError(
+                ErrorCode.INVALID_STATE,
+                f"状态 {sess.state.value} 不接受连接：会话已结束，请另开新会话",
+            )
+        dev = device_or_none(device_id)
+        if dev is None:
+            raise VPPError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"假想名册中不存在设备 {device_id}：可用全集见 link_scan；"
+                "本系统结构上无法出现真实设备",
+            )
+        already = device_id in sess.links
+        if not already:
+            sess.links[device_id] = {
+                "connected_at": now_iso(),
+                "registration": "hypothetical",
+                "plain_name": dev.plain_name,
+            }
+            sess.record(
+                HistoryEvent(
+                    kind="link",
+                    summary=(
+                        f"假想连接：{dev.plain_name}（本地状态写入，无真实握手/数据传输）；"
+                        "连接 ≠ 授权"
+                    ),
+                    state_after=sess.state.value,
+                    score_after=sess.score,
+                )
+            )
+            self.audit.event("link_connect", session_id=session_id, device_id=device_id)
+            self._save()
+        return {
+            "accepted": True,
+            "executed": not already,
+            "simulated": True,
+            "session_id": session_id,
+            "device": dev.payload(),
+            "connected_devices": list(sess.links.keys()),
+            "happening_now": CONNECT_NARRATION,
+            "note": LINK_NOTE,
+        }
+
+    def link_disconnect(self, session_id: str, device_id: str) -> dict[str, Any]:
+        """解除一个假想设备的绑定（本地状态删除；幂等）。"""
+        sess = self._get(session_id)
+        self._tick(sess)
+        if device_id not in sess.links:
+            return {
+                "accepted": True,
+                "executed": False,
+                "simulated": True,
+                "session_id": session_id,
+                "connected_devices": list(sess.links.keys()),
+                "happening_now": (
+                    "「断开」实际发生的事：该设备本就未连接，无任何状态变更（幂等）。"
+                ),
+                "note": LINK_NOTE,
+            }
+        dev = device_or_none(device_id)
+        del sess.links[device_id]
+        sess.record(
+            HistoryEvent(
+                kind="link",
+                summary=(
+                    f"假想断开：{dev.plain_name if dev else device_id}"
+                    "（本地状态删除，无真实连接可断）"
+                ),
+                state_after=sess.state.value,
+                score_after=sess.score,
+            )
+        )
+        self.audit.event("link_disconnect", session_id=session_id, device_id=device_id)
+        self._save()
+        return {
+            "accepted": True,
+            "executed": True,
+            "simulated": True,
+            "session_id": session_id,
+            "connected_devices": list(sess.links.keys()),
+            "happening_now": (
+                "「断开」实际发生的事：从本会话的绑定表删除一条本地记录。"
+                "没有真实连接可断、没有真实设备断电。"
+            ),
+            "note": LINK_NOTE,
         }
 
     def _resolve_spec(self, sess: Session, effect: str) -> EffectSpec | None:

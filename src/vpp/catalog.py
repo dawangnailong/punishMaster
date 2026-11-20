@@ -3,7 +3,9 @@
 设计原则：
 
 1. **拟物是皮肤，诚实是语义。** 每个效果除舞台化的 label 外，
-   必须携带三个诚实字段：
+   必须携带四个诚实字段：
+   - plain_name：直白语义名——Agent 面前的**第一名称**（如「口头嘉许」
+     「冷处理」「高潮许可宣告」），不依赖任何舞台意象即可理解；
    - actual_semantics：这个道具对应现实中哪一类活动（直白说明，含成人语义）；
    - channels：作用通道（口头/感官挑逗/高潮控制/心理层面/身份标记……）；
    - expectation_note：用户侧可能出现的并行现象（非保证、不可作为确定性预期）。
@@ -70,6 +72,43 @@ ANTI_EXPERIMENT_NOTE = (
     "的实验对象：同类效果反复施加时应依据观测信道的文本与指标决策，"
     "或直接询问用户感受。"
 )
+
+# ---------------------------------------------------------------- 直白语义名
+# Agent 面前的第一名称：不依赖舞台意象即可理解。
+# 舞台 label（银铃、聚光灯、沙漏……）退居其后，只是文案皮肤。
+# 完整性由测试强制：每个 EFFECTS 键都必须有非空 plain_name。
+
+PLAIN_NAMES: dict[str, str] = {
+    # 奖励
+    "chime": "口头嘉许（轻量认可）",
+    "spotlight": "角色内表扬（praise）",
+    "rose": "嘉奖信物（象征性口头嘉奖）",
+    "crown": "场景内称号授予",
+    "badge": "成就记录（徽章）",
+    "feather": "轻度感官挑逗（tease）",
+    "bell_grant": "高潮许可宣告",
+    # 惩罚
+    "dimlight": "冷处理（短暂收回注意力）",
+    "stamp": "口头训诫（明确指出不合格）",
+    "ticket": "记过训诫（记录在案）",
+    "task_card": "反省任务（书写/口头复述）",
+    "badge_withdraw": "撤回徽章/称号",
+    "hourglass_wait": "强制等待（延迟满足/denial）",
+    "jester_hat": "角色内羞辱（humiliation）",
+    "nameplate": "角色内物化标记（objectification）",
+    "scratched_ticket": "角色内贬损（degradation）",
+    # 场景
+    "curtain_open": "场景开始宣告",
+    "curtain_close": "场景谢幕（含 aftercare 收尾）",
+    "act_shift": "阶段切换宣告",
+    "interlude": "主动降档的缓和停顿",
+    # 控制
+    "hourglass": "倒计时等待任务",
+    "bell_call": "注意力召回指令",
+    "freeze": "保持不动的口头指令",
+    "release": "解除「保持不动」",
+    "observe_request": "观测请求（诚实三态）",
+}
 
 _EXPECTED_CHANNELS = ("tactile_sensation", "orgasm_control", "psychological")
 
@@ -298,6 +337,7 @@ def effects_catalog() -> list[dict[str, Any]]:
         out.append(
             {
                 "effect": spec.effect,
+                "plain_name": PLAIN_NAMES[spec.effect],
                 "label": spec.label,
                 "channels": [ch for ch in spec.channels],
                 "channel_labels": [CHANNELS.get(ch, ch) for ch in spec.channels],

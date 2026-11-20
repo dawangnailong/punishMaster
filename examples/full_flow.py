@@ -102,6 +102,17 @@ async def main() -> None:
         await step(c, "scene_resume（READY→ACTIVE）", "scene_resume",
                    {"session_id": sid}, lambda d: d["executed"] is True)
 
+        banner("④a 虚拟链路：扫描假想名册 → 连接模拟设备（连接 ≠ 授权）")
+        scanned = await step(c, "link_scan（假想名册）", "link_scan", {},
+                             lambda d: d["simulated"] is True and d["devices"])
+        print(f"    {scanned['happening_now']}")
+        for d in scanned["devices"]:
+            print(f"    · {d['device_id']}：{d['plain_name']}（registration={d['registration']}）")
+        linked = await step(c, "link_connect（sim-epp-01，本地状态写入）", "link_connect",
+                            {"session_id": sid, "device_id": "sim-epp-01"},
+                            lambda d: d["executed"] is True)
+        print(f"    {linked['happening_now']}")
+
         banner("④b 下游连接：注册能力菜单（注册 ≠ 授权）")
         menu = crew.capabilities_declaration(session_id=sid)
         announced = await step(c, "crew_announce（E-Pneumatic-Pro 模拟器）", "crew_announce",

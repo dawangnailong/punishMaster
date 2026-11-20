@@ -1,9 +1,21 @@
 # VPP 拟物互动导演台（punishMaster）
 
 一个**完全虚拟**的"互动场景执行器"：Agent（如 Claude）可以在用户明确授权的边界内，
-对用户（Master）进行奖励或虚拟惩罚。所有效果由本地拟物模拟器渲染成舞台意象文本
-（银铃、聚光灯、沙漏、气动吮吸的意象……），**不连接、不扫描、不控制任何真实硬件，
-不产生任何现实副作用**。
+对用户（Master）进行奖励或虚拟惩罚。"完全虚拟"指：真实桥接项目的**函数形状都在**
+（扫描设备 `link_scan`、连接 `link_connect`、能力注册 `crew_announce`、观测回传
+`signal_report`），但**业务全部掏空为本地模拟**——`link_scan` 遍历的是假想设备名册
+（假想注册），`link_connect` 是一次本地状态写入，效果渲染成舞台意象文本。
+**不连接、不扫描、不控制任何真实硬件，不产生任何现实副作用**（源码级禁止硬件与
+网络导入，由测试强制）。
+
+诚实优先于拟物：每个效果都有直白语义名 `plain_name`（口头嘉许/角色内表扬/冷处理/
+高潮许可宣告……）作为 Agent 面前的第一名称；舞台意象名（银铃、聚光灯、沙漏……）
+只是文案皮肤。链路操作的返回用直白语言如实叙述"此刻实际发生与没有发生的事"
+（`happening_now` 字段），不得拟物包装系统行为——防止 Agent 或用户误解为
+发生了真实的扫描/连接/控制。
+
+一句话定位：**统一 AI 驱动成人娱乐的方法层**——边界配置、显式授权、诚实语义、
+观测契约与安全不变量在此收口，可移植到任何下游；实际渲染与安全处理归下游。
 
 > 18+ only。仅面向成年人的自愿互动。**现实中的控制权始终属于用户**；
 > 本项目不含任何媒体与露骨内容，内置文案整体保持在温和～中等水平。
@@ -19,10 +31,13 @@
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  MCP 接口层  src/vpp/server.py                               │
-│  18 个工具 / 10 个资源 / 3 个提示词（stdio transport）        │
+│  21 个工具 / 10 个资源 / 3 个提示词（stdio transport）        │
 ├──────────────────────────────────────────────────────────────┤
 │  导演层  src/vpp/director.py   ← 全部业务规则，fail-closed    │
 │  状态机 DRAFT→READY→ACTIVE⇄PAUSED→STOPPED/EXPIRED            │
+├──────────────────────────────────────────────────────────────┤
+│  虚拟链路层  src/vpp/link.py（假想设备名册，函数形状保留）     │
+│  link_scan 遍历本地名册 / link_connect 本地状态写入           │
 ├──────────────────────────────────────────────────────────────┤
 │  VPP 协议层  src/vpp/protocol.py（版本化信封/结果/错误）      │
 │  下行 CueCard（抽象动作/任务/状态指令）                       │
@@ -107,9 +122,10 @@ Claude Desktop：等价地填入 `command` / `args` / `env` 三个字段。
 PYTHONPATH=src .venv/bin/python examples/full_flow.py
 ```
 
-它会依次走：创建 → 配置边界 → 授权 → 下游注册能力菜单 → 预演 → 奖励 →
-注册能力（crew:deep_throat 四档）→ 虚拟惩罚 → 暂停 → 恢复 → 历史 →
-下游观测回传（诚实三态）+ 主动话语 → 紧急停止 → 停止后拒绝执行。
+它会依次走：创建 → 配置边界 → 授权 → 扫描假想设备名册 → 连接模拟设备 →
+下游注册能力菜单 → 预演 → 奖励 → 注册能力（crew:deep_throat 四档）→
+虚拟惩罚 → 暂停 → 恢复 → 历史 → 下游观测回传（诚实三态）+ 主动话语 →
+紧急停止 → 停止后拒绝执行。
 
 ## 6. 示例交互
 
@@ -121,6 +137,8 @@ Agent 侧一次典型会话（节选自 `examples/full_flow.py` 的实际输出�
                                允许奖励清单含 crew:deep_throat、惩罚清单含 stamp
 ③ session_authorize         → consent_note 非空 → READY
 ④ scene_resume              → 「丝绒大幕拉开……小猫，戏开始了。」
+④a link_scan / link_connect → 假想名册 2 条；连接=本地状态写入（连接≠授权）
+    happening_now 如实叙述：「没有发生任何蓝牙/串口/网络扫描……」
 ④b crew_announce            → 下游注册 4 档吮吸 + 一键爆发 + 恒温层（注册≠授权）
 ⑤ action_preview            → dry_run：完整校验、预览文案、零状态变更
 ⑥ reward_issue spotlight    → 「主灯缓缓推亮……」＋语义注记＋〔全模拟〕
@@ -149,6 +167,10 @@ Agent 侧一次典型会话（节选自 `examples/full_flow.py` 的实际输出�
   （**主形态**：自然/格式化文本）、`metrics[]`（诚实三态
   `reported|unsupported|absent`，reported 必带 value，严禁编造）、
   `initiative_text + proposals[]`（下游主动话语，仅呈现不执行）。
+- **虚拟链路 `link_scan / link_connect / link_disconnect`**：假想设备名册
+  （`registration=hypothetical`）；「扫描」= 遍历本地内存记录，「连接」=
+  本地状态写入；返回的 `happening_now` 如实叙述此刻发生与没有发生的事。
+  **连接 ≠ 授权**。
 - **能力菜单 `crew_announce`**：下游连接后注册 `crew:<effect_id>` 能力；
   **注册 ≠ 授权**，执行照走允许清单 + 行为开关 + 上限。
 - **统一 `ActionResult`**：`accepted / executed / simulated:true / state /
@@ -204,6 +226,7 @@ PYTHONPATH=src .venv/bin/python -m pytest -q
 | replay 重现事件序列 | `test_replay_persistence.py::test_replay_reproduces_event_sequence` |
 | 持久化可恢复 | `test_replay_persistence.py::test_persistence_roundtrip` |
 | 无真实硬件/网络路径 | `test_no_real_hardware.py`（源码级扫描 + 能力声明断言） |
+| 虚拟链路（假想注册） | `test_virtual_link.py`（扫描/连接的函数形状 + 诚实叙述 + plain_name 完整性） |
 
 另有：领域语义语料（`test_semantics.py` + `tests/fixtures/semantics.json`）、
 诚实三态与主动话语（`test_signals.py`）、能力菜单注册≠授权

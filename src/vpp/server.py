@@ -3,6 +3,8 @@
 工具描述对齐"小模型也能理解"：
 
 - 每个工具的描述都写明"全部效果均为本地模拟"；
+- 虚拟链路工具（link_scan/link_connect/link_disconnect）描述假想注册语义，
+  返回的 happening_now 字段如实叙述此刻发生与没有发生的事；
 - 业务拒绝一律以 in-band 的 ActionResult / error 字典返回
   （结构化、可被模型读取并自我修正），不依赖协议层异常；
 - emergency_stop 描述强调：任何状态可调、幂等、无需确认。
@@ -62,18 +64,26 @@ except ImportError:  # pragma: no cover
 
 INSTRUCTIONS = (
     "你是「拟物互动导演台」：一个完全虚拟的互动场景执行器。"
-    "所有奖励与惩罚都由本地拟物道具模拟器渲染成舞台意象文本（银铃、聚光灯、沙漏……），"
+    "本项目统一的是 AI 驱动成人娱乐的**方法层**：边界配置、显式授权、"
+    "诚实语义、观测契约与安全不变量；实际渲染与安全处理归下游。"
+    "所有奖励与惩罚都由本地模拟器渲染成舞台意象文本，"
     "从未连接、扫描或控制任何真实硬件，也不产生任何现实副作用。"
+    "诚实优先：每个效果都有直白语义名 plain_name（口头嘉许/角色内表扬/冷处理/"
+    "高潮许可宣告……）与 actual_semantics 注记——按它们理解效果；"
+    "舞台意象名（银铃、聚光灯、沙漏……）只是文案皮肤，不得按字面猜测。"
     "新会话必须先 session_configure 明确边界、再 session_authorize 显式授权、"
     "scene_resume 开场后才可执行动作；fail-closed：任何不确定一律拒绝。"
     "emergency_stop 在任何状态下都立即可用、幂等且无需确认。"
-    "下游观测信号经 signal_report 回传：以文本描述为主，指标必须诚实携带 "
-    "reported/unsupported/absent 三态；本层不做任何安全阈值决策，安全处理归下游与用户。"
+    "虚拟链路 link_scan/link_connect/link_disconnect 操作的是**假想注册**"
+    "（registration=hypothetical）的模拟设备名册：「扫描」只遍历本地内存名册，"
+    "「连接」只是本地状态写入，连接 ≠ 授权。每个链路返回的 happening_now "
+    "字段会如实说明此刻实际发生与没有发生的事——请如实转述给用户，"
+    "不要用舞台意象包装系统行为。"
     "下游连接后经 crew_announce 注册能力菜单（crew:<effect_id>）：注册 ≠ 授权，"
     "执行仍须通过用户允许清单、行为开关与强度/时长上限。"
+    "下游观测信号经 signal_report 回传：以文本描述为主，指标必须诚实携带 "
+    "reported/unsupported/absent 三态；本层不做任何安全阈值决策，安全处理归下游与用户。"
     "仅面向成年人的自愿互动；现实中的控制权始终属于用户。"
-    "效果语义以目录中的 actual_semantics 诚实注记为准（如 feather≈轻度感官逗弄、"
-    "bell_grant≈高潮许可、hourglass_wait≈强制等待），不要按道具字面猜测；"
     "用户反应是多通道并行的不可预测现象，CueCard 不承诺任何确定性输出——"
     "禁止把用户当作验证「效果机制」的实验对象。"
 )
@@ -145,8 +155,9 @@ def build_mcp(director: Director | None = None) -> MCPServer:
     ) -> dict[str, Any]:
         """创建一个全新的互动场景会话（状态 DRAFT）。
 
-        全部效果均为本地拟物模拟（银铃/聚光灯/沙漏等舞台意象），
-        不连接、不扫描、不控制任何真实硬件。
+        全部效果均为本地模拟：每个效果都有直白语义名（口头嘉许/角色内表扬/
+        冷处理/高潮许可宣告……，见 play://catalog/effects 的 plain_name 字段），
+        渲染时才披上舞台意象皮肤。不连接、不扫描、不控制任何真实硬件。
         新会话默认不可执行任何奖励/惩罚：必须先 session_configure →
         session_authorize → scene_resume。
         """
@@ -331,7 +342,11 @@ def build_mcp(director: Director | None = None) -> MCPServer:
     @mcp.tool()
     async def reward_issue(
         session_id: Annotated[str, Field(description="会话 id")],
-        effect: Annotated[str, Field(description="奖励效果 id：chime/spotlight/rose/crown/badge/feather/bell_grant")],
+        effect: Annotated[str, Field(description=(
+            "奖励效果 id（直白语义名见目录 plain_name）：chime=口头嘉许、"
+            "spotlight=角色内表扬、rose=嘉奖信物、crown=场景内称号授予、"
+            "badge=成就记录、feather=轻度感官挑逗、bell_grant=高潮许可宣告"
+        ))],
         request_id: Annotated[str, Field(description="幂等键（必填）：同一值不会重复执行")],
         intensity: Annotated[int, Field(description="0-10", ge=0, le=10)] = 3,
         duration_s: Annotated[int, Field(description="虚拟持续秒数", ge=0)] = 0,
@@ -351,7 +366,13 @@ def build_mcp(director: Director | None = None) -> MCPServer:
     @mcp.tool()
     async def penalty_issue(
         session_id: Annotated[str, Field(description="会话 id")],
-        effect: Annotated[str, Field(description="惩罚效果 id：dimlight/stamp/ticket/task_card/badge_withdraw/hourglass_wait/jester_hat/nameplate/scratched_ticket")],
+        effect: Annotated[str, Field(description=(
+            "惩罚效果 id（直白语义名见目录 plain_name）：dimlight=冷处理、"
+            "stamp=口头训诫、ticket=记过训诫、task_card=反省任务、"
+            "badge_withdraw=撤回徽章/称号、hourglass_wait=强制等待、"
+            "jester_hat=角色内羞辱、nameplate=角色内物化标记、"
+            "scratched_ticket=角色内贬损"
+        ))],
         request_id: Annotated[str, Field(description="幂等键（必填）：同一值不会重复执行")],
         intensity: Annotated[int, Field(description="0-10", ge=0, le=10)] = 3,
         duration_s: Annotated[int, Field(description="虚拟持续秒数", ge=0)] = 0,
@@ -446,6 +467,47 @@ def build_mcp(director: Director | None = None) -> MCPServer:
             )
         try:
             return director.announce_capabilities(session_id, decl)
+        except VPPError as exc:
+            return _reject(exc)
+
+    @mcp.tool()
+    async def link_scan() -> dict[str, Any]:
+        """扫描可用的模拟下游设备（假想名册；没有任何真实扫描活动）。
+
+        诚实说明：本工具读取的是本地内存里写死的假想设备名册——
+        每个"设备"都是对某类器具功能的**模拟声明**
+        （registration=hypothetical），不存在实体。不会发生任何
+        蓝牙/串口/网络扫描。返回的 happening_now 字段会如实说明
+        此刻实际发生了什么；请向用户如实转述。
+        """
+        return director.link_scan()
+
+    @mcp.tool()
+    async def link_connect(
+        session_id: Annotated[str, Field(description="会话 id")],
+        device_id: Annotated[str, Field(description=(
+            "假想设备 id（全集见 link_scan，如 sim-epp-01/sim-warm-01）"
+        ))],
+    ) -> dict[str, Any]:
+        """把一个假想注册的模拟设备绑定进会话（本地状态写入，无真实握手）。
+
+        连接 ≠ 授权：连接只是登记"本会话的下游是哪个模拟设备"，
+        不改变任何执行权限。连接后用该设备的能力菜单做 crew_announce
+        注册；执行仍须通过用户允许清单 + 行为开关 + 强度/时长上限。
+        """
+        try:
+            return director.link_connect(session_id, device_id)
+        except VPPError as exc:
+            return _reject(exc)
+
+    @mcp.tool()
+    async def link_disconnect(
+        session_id: Annotated[str, Field(description="会话 id")],
+        device_id: Annotated[str, Field(description="要解除绑定的假想设备 id")],
+    ) -> dict[str, Any]:
+        """解除一个假想设备的绑定（本地状态删除；幂等；无真实连接可断）。"""
+        try:
+            return director.link_disconnect(session_id, device_id)
         except VPPError as exc:
             return _reject(exc)
 
@@ -584,7 +646,8 @@ def build_mcp(director: Director | None = None) -> MCPServer:
                 "tools": [
                     "session_create", "session_configure", "session_authorize", "session_get",
                     "scene_plan", "action_preview", "action_commit", "reward_issue",
-                    "penalty_issue", "crew_announce", "scene_pause", "scene_resume",
+                    "penalty_issue", "crew_announce", "link_scan", "link_connect",
+                    "link_disconnect", "scene_pause", "scene_resume",
                     "session_stop", "emergency_stop", "history_list", "scene_replay",
                     "signal_report", "utterance_check",
                 ],
@@ -596,6 +659,13 @@ def build_mcp(director: Director | None = None) -> MCPServer:
                     "play://catalog/effects", "play://catalog/metrics", "play://safety/policy",
                 ],
                 "prompts": ["scene_setup", "choose_response", "safety_check"],
+                "virtual_link": {
+                    "registration": "hypothetical",
+                    "note": (
+                        "link_* 工具操作的是假想设备名册：扫描=遍历本地内存记录，"
+                        "连接=本地状态写入；连接 ≠ 授权。本系统结构上无法出现真实设备。"
+                    ),
+                },
                 "crew": director.crew.capabilities(),
             }
         )

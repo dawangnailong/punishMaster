@@ -116,6 +116,9 @@ class Session(BaseModel):
     crew_effects: dict[str, dict[str, Any]] = Field(default_factory=dict)
     crew_name: str | None = None
 
+    # 虚拟链路（假想注册的模拟设备绑定表；连接 ≠ 授权，纯本地状态）
+    links: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
     # 确定性
     rng_salt: str = Field(default_factory=lambda: new_id("salt"))
 
@@ -168,6 +171,7 @@ class Session(BaseModel):
             "history_count": len(self.history),
             "crew_effects_registered": len(self.crew_effects),
             "crew_name": self.crew_name,
+            "links_connected": list(self.links.keys()),
             "agent_title": cfg.agent_title if cfg else None,
             "user_title": cfg.user_title if cfg else None,
         }
